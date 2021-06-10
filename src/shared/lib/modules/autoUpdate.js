@@ -7,6 +7,7 @@ import store from 'store';
 import * as TYPE from 'consts/actionTypes';
 import { showNotification } from 'lib/ui';
 import { history } from 'lib/wallet';
+import { saveLastChecked } from './repo';
 // import { walletDataDir } from 'consts/paths';
 // import ensureDirExists from 'utils/ensureDirExists';
 // import downloadFile from 'utils/downloadFile';
@@ -36,18 +37,23 @@ async function getLatestRelease(repo) {
 async function checkForModuleUpdate(module) {
   try {
     if (!module.repository) return null;
+    if (module.checked && Date.now() - module.checked <= 1000 * 60 * 1)
+      return null;
     const release = await getLatestRelease(module.repository);
     if (!release || !release.tag_name || !release.assets) return null;
 
     const latestVersion = release.tag_name.startsWith('v')
       ? release.tag_name.substring(1)
       : release.tag_name;
-    if (
-      !semver.valid(latestVersion) ||
-      !semver.valid(module.info.version) ||
-      !semver.gt(latestVersion, module.info.version)
-    )
+
+    if (!semver.valid(latestVersion) || !semver.valid(module.info.version))
       return null;
+
+    if (!semver.gt(latestVersion, module.info.version)) {
+      //no update so say it has been checked.
+      saveLastChecked(module.path);
+      null;
+    }
 
     return { module, latestVersion, latestRelease: release };
 

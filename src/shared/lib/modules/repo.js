@@ -33,7 +33,6 @@ const repoInfoSchema = {
         moduleHash: { type: 'string' },
         repository: {
           type: 'object',
-          required: ['type', 'host', 'owner', 'repo', 'commit'],
           properties: {
             type: { type: 'string', enum: ['git'] },
             // Allowed hosting: github.com
@@ -43,9 +42,11 @@ const repoInfoSchema = {
             // Full SHA-1 hash of the git commit this version was built on
             commit: { type: 'string', minLength: 40, maxLength: 40 },
           },
+          required: ['type', 'host', 'owner', 'repo', 'commit'],
         },
       },
     },
+    checked: { type: 'integer' },
   },
 };
 const validateRepoInfo = ajv.compile(repoInfoSchema);
@@ -127,7 +128,37 @@ export async function loadRepoInfo(dirPath) {
     // Validate schema
     if (validateRepoInfo(repoInfo)) {
       return repoInfo;
+    } else {
+      console.error(validateRepoInfo.errors);
     }
+  } catch (err) {
+    console.error(err);
+  }
+
+  return null;
+}
+
+export async function saveLastChecked(dirPath) {
+  const filePath = join(dirPath, 'repo_info.json');
+  // Check repo_info.json file exists
+  if (!fs.existsSync(filePath)) return null;
+
+  // Check repo_info.json file is a symbolic link
+  const lstat = await fs.promises.lstat(filePath);
+  if (lstat.isSymbolicLink()) return null;
+
+  try {
+    // Load file content
+    const repoInfoPath = join(dirPath, 'repo_info.json');
+    const fileContent = await fs.promises.readFile(repoInfoPath);
+    const repoInfo = JSON.parse(fileContent);
+    repoInfo.checked = Date.now();
+    await fs.promises.writeFile(
+      repoInfoPath,
+      JSON.stringify(repoInfo, null, 2)
+    );
+
+    return true;
   } catch (err) {
     console.error(err);
   }
@@ -143,7 +174,6 @@ export async function loadRepoInfo(dirPath) {
  */
 export async function isRepoOnline({ host, owner, repo, commit }) {
   if (!host || !owner || !repo || !commit) return false;
-
   try {
     const apiUrls = {
       'github.com': `https://api.github.com/repos/${owner}/${repo}/commits/${commit}`,

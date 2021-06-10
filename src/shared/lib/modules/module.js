@@ -357,6 +357,7 @@ async function initializeModule(module) {
   const repoInfo = await loadRepoInfo(module.path);
   if (repoInfo) {
     module.repository = repoInfo.data.repository;
+    repoInfo.checked ? (module.checked = repoInfo.checked) : null;
     const [repoOnline, repoVerified, repoFromNexus] = await Promise.all([
       isRepoOnline(module.repository),
       isModuleVerified(module, repoInfo),
